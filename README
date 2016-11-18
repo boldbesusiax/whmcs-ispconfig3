@@ -1,0 +1,8 @@
+I made this while tinkering with cwispy's ispcfg3 module, credits go to him for making the original WHMCS module. The following is based on a GNU/Linux Debian 8 server using Apache based off the ISPConfig 3.1 tut with WHMCS 7.
+
+This script has a few fundamental changes from the original module, for example the IP address of the server passed to the module will be the IP set in DNS A records. This script also only requires web servers to be in the WHMCS server list and allows an operator to create a server list of mirror master servers (ie: other servers are a mirror of this one) in which WHMCS can balance account creation to a variety of servers that you list such as filling the current default server or switching between servers. Another change that something to take note of is that using the remote api dns_templatezone_add on a BIND based server seems to simply not create a DNS zone or any records, I did not debug this very far and created a generic template that is similar to the default template in ISPConfig manually to ensure zone creation. Manually creating the DNS zone is a poor drop in replacement which I am trying to resolve, but at the very least it works for now.
+
+Prerequisite:
+This script relies on detecting the mirror server id of a server, I modified some of the remote api code in (/usr/local/ispconfig/interface/lib/classes/remote.d/server.inc.php) on line 203 of the function server_get_functions. Just add , mirror_server_id after firewall_server so it looks like this:
+
+$sql = "SELECT mail_server, web_server, dns_server, file_server, db_server, vserver_server, proxy_server, firewall_server, mirror_server_id FROM server WHERE server_id  = ? LIMIT 1 ";

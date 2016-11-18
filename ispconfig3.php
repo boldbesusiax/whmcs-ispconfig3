@@ -120,7 +120,7 @@ function ispconfig3_ConfigOptions() {
 	return $config;
 }
 
-function ispconfig3_CreateAccount( $params ) {
+function ispconfig3_CreateAccount($params) {
 	$soapuser = $params['configoption1'];
 	$soappass = $params['configoption2'];
 	$soapurl = $params['configoption3'];
@@ -134,7 +134,7 @@ function ispconfig3_CreateAccount( $params ) {
 	$fullname = htmlspecialchars_decode($clientdetails['firstname']) . ' ' . htmlspecialchars_decode($clientdetails['lastname']);
 	$companyname = htmlspecialchars_decode($clientdetails['companyname']);
 	$address = $clientdetails['address1'];
-	if ( !empty($clientdetails['address2'])) {
+	if (!empty($clientdetails['address2'])) {
 		$address = $clientdetails['address1'] . $clientdetails['address2'];
 	}
 	$zip = $clientdetails['postcode'];
@@ -329,32 +329,25 @@ function ispconfig3_CreateAccount( $params ) {
 					$defaultmailservername = $servermaster['mail_server'][$rand]['server_name'];
 				}
 					
-				if(count($server['dns_server']) == 1) {
+				if(count($servermaster['dns_server']) == 1) {
 					$defaultdnsserver = $server['dns_server'][0]['server_id'];
 					$nameserver = $server['dns_server'][0]['server_name'];
-					$nameserverslave = $server['dns_server'][0]['server_name'];
 				}
-				else { //for setups with several master dns servers add random selector from servers with mirror_server_id = 0
-					$index = 0; //first master dns server found is always selected, todo: add random master selector (prototype on others)
-					$indexslave = 0;
-					$rand = rand(0,(count($server['dns_server']) - 1));
-					while($index <= count($server['dns_server'])) {
-						$mirror_id = $soap_client->server_get_functions($soap_session_id,$server['dns_server'][$index]['server_id']);
-						if($mirror_id[0]['mirror_server_id'] == 0){
-							$defaultdnsserver = $server['dns_server'][$index]['server_id'];
-							$nameserver = $server['dns_server'][$index]['server_name'];
-							while($indexslave <= count($server['dns_server'])) {
-								$mirror_id = $soap_client->server_get_functions($soap_session_id,$server['dns_server'][$indexslave]['server_id']);
-								if($mirror_id[0]['mirror_server_id'] == $defaultdnsserver) {
-									$nameserverslave = $server['dns_server'][$indexslave]['server_name'];
-									break;
-								}
-								++$indexslave;
-							}
-							break;
-						}
-						++$index;
+				else {
+					$rand = rand(0,(count($servermaster['dns_server']) -1));
+					$defaultdnsserver = $servermaster['dns_server'][$rand]['server_id'];
+					$nameserver = $servermaster['dns_server'][$rand]['server_name'];
+				}
+				
+				$index = 0;
+				$nameserverslave = 0;
+				
+				while($index <= count($server['dns_server'])) {
+					$mirror_id = $soap_client->server_get_functions($soap_session_id,$server['dns_server'][$index]['server_id']);
+					if($mirror_id[0]['mirror_server_id'] == $defaultdnsserver) {
+						$nameserverslave = $server['dns_server'][$index]['server_name'];
 					}
+					++$index;
 				}
 				
 				logModuleCall('ispconfig3','DNS Mirror ID',$nameserverslave,$defaultdnsserver.' - '.$nameserver.' - '.$mirror_id[0]['mirror_server_id'],'','');
@@ -473,7 +466,7 @@ function ispconfig3_CreateAccount( $params ) {
 						'active' => 'y'
 					);
 					$zone_id = $soap_client->dns_ns_add($soap_session_id,$client_id,$ispconfigparams);
-					
+				
 					$ispconfigparams = array(
 						'server_id' => $defaultdnsserver,
 						'zone' => $dns_id,
@@ -522,7 +515,7 @@ function ispconfig3_CreateAccount( $params ) {
 						'redirect_type' => '',
 						'redirect_path' => '',
 						'ssl' => 'y',
-						'ssl_letsencrypt' => 'y',
+						'ssl_letsencrypt' => 'n',
 						'ssl_state' => $state,
 						'ssl_locality' => $city,
 						'ssl_organisation' => $companyname,
@@ -545,7 +538,7 @@ function ispconfig3_CreateAccount( $params ) {
 						'pm_min_spare_servers' => '1',
 						'pm_max_spare_servers' => '5',
 						'pm_process_idle_timeout' => '10',
-						'pm_max_requests' => '200',
+						'pm_max_requests' => '1024',
 						'custom_php_ini' => '',
 						'backup_interval' => 'daily',
 						'backup_copies' => 3,
@@ -607,7 +600,7 @@ function ispconfig3_CreateAccount( $params ) {
 	return $result;
 }
 
-function ispconfig3_TerminateAccount( $params ) {
+function ispconfig3_TerminateAccount($params) {
 	$soapuser = $params['configoption1'];
 	$soappass = $params['configoption2'];
 	$soapurl = $params['configoption3'];
@@ -621,7 +614,7 @@ function ispconfig3_TerminateAccount( $params ) {
 	$fullname = htmlspecialchars_decode($clientdetails['firstname']) . ' ' . htmlspecialchars_decode($clientdetails['lastname']);
 	$companyname = htmlspecialchars_decode($clientdetails['companyname']);
 	$address = $clientdetails['address1'];
-	if ( !empty($clientdetails['address2'])) {
+	if (!empty($clientdetails['address2'])) {
 		$address = $clientdetails['address1'] . $clientdetails['address2'];
 	}
 	$zip = $clientdetails['postcode'];
@@ -653,7 +646,7 @@ function ispconfig3_TerminateAccount( $params ) {
 	
 	logModuleCall('ispconfig3','CreateClient',$params['clientdetails'],$params,'','');
 	
-	if ( $usessl == 'on') {
+	if ($usessl == 'on') {
 		
 		$soap_url = 'https://' . $soapurl . '/remote/index.php';
 		$soap_uri = 'https://' . $soapurl . '/remote/';
@@ -665,7 +658,7 @@ function ispconfig3_TerminateAccount( $params ) {
 		$soap_uri = 'http://' . $soapurl . '/remote/';
 	}
 	
-	if ( (isset($username) && $username != '') && (isset($password) && $password != '') ) {
+	if ((isset($username) && $username != '') && (isset($password) && $password != '')) {
 		try {
 			
 			$soap_client = new SoapClient(
@@ -676,10 +669,11 @@ function ispconfig3_TerminateAccount( $params ) {
 					'stream_context' => stream_context_create(
 						array('ssl' => array(
 							'verify_peer' => false,
-							'verify_peer_name' => false))
-							),
-							'trace' => false
-					 )
+							'verify_peer_name' => false)
+							)
+						),
+					'trace' => false
+				)
 			);
 			/* Authenticate and get serverID's from WHMCS */
 			$soap_session_id = $soap_client->login($soapuser,$soappass);
@@ -716,7 +710,7 @@ function ispconfig3_TerminateAccount( $params ) {
 	return $result;
 }
 
-function ispconfig3_ChangePackage( $params ) {
+function ispconfig3_ChangePackage($params) {
 	$soapuser = $params['configoption1'];
 	$soappass = $params['configoption2'];
 	$soapurl = $params['configoption3'];
@@ -730,7 +724,7 @@ function ispconfig3_ChangePackage( $params ) {
 	$fullname = htmlspecialchars_decode($clientdetails['firstname']) . ' ' . htmlspecialchars_decode($clientdetails['lastname']);
 	$companyname = htmlspecialchars_decode($clientdetails['companyname']);
 	$address = $clientdetails['address1'];
-	if ( !empty($clientdetails['address2'])) {
+	if (!empty($clientdetails['address2'])) {
 		$address = $clientdetails['address1'] . $clientdetails['address2'];
 	}
 	$zip = $clientdetails['postcode'];
@@ -762,7 +756,7 @@ function ispconfig3_ChangePackage( $params ) {
 	
 	logModuleCall('ispconfig3','CreateClient',$params['clientdetails'],$params,'','');
 	
-	if ( $usessl == 'on') {
+	if ($usessl == 'on') {
 		
 		$soap_url = 'https://' . $soapurl . '/remote/index.php';
 		$soap_uri = 'https://' . $soapurl . '/remote/';
@@ -774,7 +768,7 @@ function ispconfig3_ChangePackage( $params ) {
 		$soap_uri = 'http://' . $soapurl . '/remote/';
 	}
 	
-	if ( (isset($username) && $username != '') && (isset($password) && $password != '') ) {
+	if ((isset($username) && $username != '') && (isset($password) && $password != '')) {
 		try {
 			
 			$soap_client = new SoapClient(
@@ -785,10 +779,11 @@ function ispconfig3_ChangePackage( $params ) {
 					'stream_context' => stream_context_create(
 						array('ssl' => array(
 							'verify_peer' => false,
-							'verify_peer_name' => false))
-							),
-							'trace' => false
-					 )
+							'verify_peer_name' => false)
+							)
+					),
+					'trace' => false
+				)
 			);
 			/* Authenticate and get serverID's from WHMCS */
 			$soap_session_id = $soap_client->login($soapuser,$soappass);
@@ -828,7 +823,7 @@ function ispconfig3_ChangePackage( $params ) {
 	return $result;
 }
 
-function ispconfig3_SuspendAccount( $params ) {
+function ispconfig3_SuspendAccount($params) {
 	$soapuser = $params['configoption1'];
 	$soappass = $params['configoption2'];
 	$soapurl = $params['configoption3'];
@@ -839,11 +834,11 @@ function ispconfig3_SuspendAccount( $params ) {
 	$domain = strtolower($params['domain']);
 	$clientdetails = $params['clientsdetails'];
 	
-	$fullname = htmlspecialchars_decode($clientdetails['firstname']) . ' ' . htmlspecialchars_decode($clientdetails['lastname']);
+	$fullname = htmlspecialchars_decode($clientdetails['firstname']).' '.htmlspecialchars_decode($clientdetails['lastname']);
 	$companyname = htmlspecialchars_decode($clientdetails['companyname']);
 	$address = $clientdetails['address1'];
-	if ( !empty($clientdetails['address2'])) {
-		$address = $clientdetails['address1'] . $clientdetails['address2'];
+	if(!empty($clientdetails['address2'])) {
+		$address = $clientdetails['address1'].$clientdetails['address2'];
 	}
 	$zip = $clientdetails['postcode'];
 	$city = $clientdetails['city'];
@@ -874,7 +869,7 @@ function ispconfig3_SuspendAccount( $params ) {
 	
 	logModuleCall('ispconfig3','CreateClient',$params['clientdetails'],$params,'','');
 	
-	if ( $usessl == 'on') {
+	if($usessl == 'on') {
 		
 		$soap_url = 'https://' . $soapurl . '/remote/index.php';
 		$soap_uri = 'https://' . $soapurl . '/remote/';
@@ -886,7 +881,7 @@ function ispconfig3_SuspendAccount( $params ) {
 		$soap_uri = 'http://' . $soapurl . '/remote/';
 	}
 	
-	if ( (isset($username) && $username != '') && (isset($password) && $password != '') ) {
+	if ((isset($username) && $username != '') && (isset($password) && $password != '')) {
 		try {
 			
 			$soap_client = new SoapClient(
@@ -897,10 +892,11 @@ function ispconfig3_SuspendAccount( $params ) {
 					'stream_context' => stream_context_create(
 						array('ssl' => array(
 							'verify_peer' => false,
-							'verify_peer_name' => false))
-							),
-							'trace' => false
-					 )
+							'verify_peer_name' => false)
+							)
+					),
+					'trace' => false
+				)
 			);
 			/* Authenticate and get serverID's from WHMCS */
 			$soap_session_id = $soap_client->login($soapuser,$soappass);
@@ -940,7 +936,7 @@ function ispconfig3_SuspendAccount( $params ) {
 	return $result;
 }
 
-function ispconfig3_UnsuspendAccount( $params ) {
+function ispconfig3_UnsuspendAccount($params) {
 	$soapuser = $params['configoption1'];
 	$soappass = $params['configoption2'];
 	$soapurl = $params['configoption3'];
@@ -954,7 +950,7 @@ function ispconfig3_UnsuspendAccount( $params ) {
 	$fullname = htmlspecialchars_decode($clientdetails['firstname']) . ' ' . htmlspecialchars_decode($clientdetails['lastname']);
 	$companyname = htmlspecialchars_decode($clientdetails['companyname']);
 	$address = $clientdetails['address1'];
-	if ( !empty($clientdetails['address2'])) {
+	if(!empty($clientdetails['address2'])) {
 		$address = $clientdetails['address1'] . $clientdetails['address2'];
 	}
 	$zip = $clientdetails['postcode'];
@@ -986,7 +982,7 @@ function ispconfig3_UnsuspendAccount( $params ) {
 	
 	logModuleCall('ispconfig3','CreateClient',$params['clientdetails'],$params,'','');
 	
-	if ( $usessl == 'on') {
+	if ($usessl == 'on') {
 		
 		$soap_url = 'https://' . $soapurl . '/remote/index.php';
 		$soap_uri = 'https://' . $soapurl . '/remote/';
@@ -998,7 +994,7 @@ function ispconfig3_UnsuspendAccount( $params ) {
 		$soap_uri = 'http://' . $soapurl . '/remote/';
 	}
 	
-	if ( (isset($username) && $username != '') && (isset($password) && $password != '') ) {
+	if ((isset($username) && $username != '') && (isset($password) && $password != '')) {
 		try {
 			
 			$soap_client = new SoapClient(
@@ -1009,10 +1005,11 @@ function ispconfig3_UnsuspendAccount( $params ) {
 					'stream_context' => stream_context_create(
 						array('ssl' => array(
 							'verify_peer' => false,
-							'verify_peer_name' => false))
-							),
-							'trace' => false
-					 )
+							'verify_peer_name' => false)
+							)
+					),
+					'trace' => false
+				)
 			);
 			/* Authenticate and get serverID's from WHMCS */
 			$soap_session_id = $soap_client->login($soapuser,$soappass);
@@ -1052,7 +1049,7 @@ function ispconfig3_UnsuspendAccount( $params ) {
 	return $result;
 }
 
-function ispconfig3_ChangePassword( $params ) {
+function ispconfig3_ChangePassword($params) { //todo: have stats and ftp password change with client update
 	$soapuser = $params['configoption1'];
 	$soappass = $params['configoption2'];
 	$soapurl = $params['configoption3'];
@@ -1063,10 +1060,10 @@ function ispconfig3_ChangePassword( $params ) {
 	$domain = strtolower($params['domain']);
 	$clientdetails = $params['clientsdetails'];
 	
-	$fullname = htmlspecialchars_decode($clientdetails['firstname']) . ' ' . htmlspecialchars_decode($clientdetails['lastname']);
+	$fullname = htmlspecialchars_decode($clientdetails['firstname']).' '.htmlspecialchars_decode($clientdetails['lastname']);
 	$companyname = htmlspecialchars_decode($clientdetails['companyname']);
 	$address = $clientdetails['address1'];
-	if ( !empty($clientdetails['address2'])) {
+	if (!empty($clientdetails['address2'])) {
 		$address = $clientdetails['address1'] . $clientdetails['address2'];
 	}
 	$zip = $clientdetails['postcode'];
@@ -1098,7 +1095,7 @@ function ispconfig3_ChangePassword( $params ) {
 	
 	logModuleCall('ispconfig3','CreateClient',$params['clientdetails'],$params,'','');
 	
-	if ( $usessl == 'on') {
+	if ($usessl == 'on') {
 		
 		$soap_url = 'https://' . $soapurl . '/remote/index.php';
 		$soap_uri = 'https://' . $soapurl . '/remote/';
@@ -1110,7 +1107,7 @@ function ispconfig3_ChangePassword( $params ) {
 		$soap_uri = 'http://' . $soapurl . '/remote/';
 	}
 	
-	if ( (isset($username) && $username != '') && (isset($password) && $password != '') ) {
+	if ((isset($username) && $username != '') && (isset($password) && $password != '')) {
 		try {
 			
 			$soap_client = new SoapClient(
@@ -1121,10 +1118,11 @@ function ispconfig3_ChangePassword( $params ) {
 					'stream_context' => stream_context_create(
 						array('ssl' => array(
 							'verify_peer' => false,
-							'verify_peer_name' => false))
-							),
-							'trace' => false
-					 )
+							'verify_peer_name' => false)
+							)
+					),
+					'trace' => false
+				)
 			);
 			/* Authenticate and get serverID's from WHMCS */
 			$soap_session_id = $soap_client->login($soapuser,$soappass);
@@ -1161,11 +1159,11 @@ function ispconfig3_ChangePassword( $params ) {
 	return $result;
 }
 
-function ispconfig3_LoginLink( $params ) { //fix button, not gettings
+function ispconfig3_LoginLink($params) {
     $soapurl = $params['configoption3'];
     $usessl = $params['configoption4'];
 
-	if ( $usessl == 'on') {
+	if($usessl == 'on') {
 		
 		$soap_url = 'https://' . $soapurl;
 	
@@ -1176,28 +1174,24 @@ function ispconfig3_LoginLink( $params ) { //fix button, not gettings
 	}
 		
     return '
-    <button type="button" class="btn btn-xs btn-success" onclick="$(\'#frmIspconfigLogin\').submit()">Login to Controlpanel</button>
+    <button type="button" class="btn btn-xs btn-success" onclick="ispconfigLogin">Login to Controlpanel</button>
     <script type="text/javascript">
-    var ispconfigForm = "<form id=\"frmIspconfigLogin\" action=\"'.$soap_url.'/index.php\" method=\"GET\" target=\"_blank\"></form>";
-    $(document).ready(function(){
-        $("body").append(ispconfigForm);
-        $("#frmIspconfigLogin").submit(function(){
-            $.ajax({ 
-                type: "POST", 
-                url: "'.$soap_url.'/content.php",
-                data: "s_mod=login&s_pg=index&username='.$params['username'].'&passwort='.$params['password'].'", 
-                xhrFields: {withCredentials: true} 
-            });
-        });
-    });
+		function ispconfigLogin() {
+			$.ajax({
+				type: "post",
+				url: "'.$soap_url.'./login/index.php",
+				data: "s_mod=login&s_pg=index&username='.$params['username'].'&passwort='.$params['password'].'",
+				xhrFields: {withCredentials: true}
+			}).done(function(){ location.href=\''.$soap_url.'/index.php\' });
+		}
     </script>';
 }
 
-function ispconfig3_ClientArea( $params ) {
+function ispconfig3_ClientArea($params) {
     $soapurl = $params['configoption3'];
     $usessl = $params['configoption4'];
 
-	if ( $usessl == 'on') {
+	if ($usessl == 'on') {
 		
 		$soap_url = 'https://' . $soapurl;
 	
@@ -1207,24 +1201,18 @@ function ispconfig3_ClientArea( $params ) {
 		$soap_url = 'http://' . $soapurl;
 	}
 	
-
-    $code = '
-    <form id="frmIspconfigLogin" action="'.$soap_url.'/index.php" method="GET" target="_blank">
-    <button type="submit" class="btn btn-xs btn-success">CONTROLPANEL LOGIN</button>
-    </form>
-
+    return '
+    <button type="button" class="btn btn-xs btn-success" onclick="ispconfigLogin">Login to Controlpanel</button>
     <script type="text/javascript">
-    $("#frmIspconfigLogin").submit(function(){
-        $.ajax({ 
-            type: "POST", 
-            url: "'.$soap_url.'/content.php",
-            data: "s_mod=login&s_pg=index&username='.$params['username'].'&passwort='.$params['password'].'", 
-            xhrFields: {withCredentials: true} 
-        });
-    });
+		function ispconfigLogin() {
+			$.ajax({
+				type: "post",
+				url: "'.$soap_url.'./login/index.php",
+				data: "s_mod=login&s_pg=index&username='.$params['username'].'&passwort='.$params['password'].'",
+				xhrFields: {withCredentials: true}
+			}).done(function(){ location.href=\''.$soap_url.'/index.php\' });
+		}
     </script>';
-
-    return $code;
 }
 
 ?>
