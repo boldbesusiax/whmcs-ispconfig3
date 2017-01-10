@@ -1,10 +1,10 @@
 <?php
 /*
  * 
- *  ISPConfig v3.x module for WHMCS v5.x or Higher
- *  Copyright (C) 2014, 2015  Shane Chrisp
+ *  Original fork from ispcfg3 by Shane Chrisp
  *
- *  Updated for ISPConfig 3.1 and WHMCS v7 by Dylan Pawlak
+ *  ISPConfig 3.1 Provisioning module for WHMCS v7+
+ *  Copyright Pawlak Consulting, Dylan Pawlak
  * 
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -150,6 +150,7 @@ function ispconfig3_CreateAccount($params) {
 	$shellaccess = $params['configoption6'];
 	$createweb = $params['configoption7'];
 	$phpmode = $params['configoption8'];
+	$phpversion = '';
 	$webstorage = $params['configoption9'];
 	$webtraffic = $params['configoption10'];
 	$params['configoption11'] == 'on' ? $webenablecgi = 'y' : $webenablecgi = '';
@@ -206,6 +207,7 @@ function ispconfig3_CreateAccount($params) {
 				$defaultfileserver = 0;
 				$defaultdbserver = 0;
 				$defaultmailserver = 0;
+				$defaultmailserverip = 0;
 				$defaultdnsserver = 0;
 				$index = 0;
 				$server = array();
@@ -328,6 +330,10 @@ function ispconfig3_CreateAccount($params) {
 					$defaultmailserver = $servermaster['mail_server'][$rand]['server_id'];
 					$defaultmailservername = $servermaster['mail_server'][$rand]['server_name'];
 				}
+				
+				if($defaultmailserver != 0) {
+					$defaultmailserverip = $soap_client->server_ip_get($soap_session_id,$defaultmailserver);
+				}
 					
 				if(count($servermaster['dns_server']) == 1) {
 					$defaultdnsserver = $server['dns_server'][0]['server_id'];
@@ -352,6 +358,50 @@ function ispconfig3_CreateAccount($params) {
 				
 				logModuleCall('ispconfig3','DNS Mirror ID',$nameserverslave,$defaultdnsserver.' - '.$nameserver.' - '.$mirror_id[0]['mirror_server_id'],'','');
 				logModuleCall('ispconfig3','ServerList',$servermaster,$server,'','');
+				
+				if(count($params['configoptions']) >= 1) {
+		
+					foreach($params['configoptions'] as $config_option => $config_option_value) {
+			
+						$config_option = trim(strtolower($config_option));
+			
+						if($config_option == 'phpmode') {
+							if($config_option_value == 'no') {
+								$phpmode = 'no';
+							}
+							elseif($config_option_value == 'cgi') {
+								$phpmode = 'cgi';
+							}
+							elseif($config_option_value == 'fast-cgi') {
+								$phpmode = 'fast-cgi';
+							}
+							elseif($config_option_value == 'php-fpm') {
+								$phpmode = 'php-fpm';
+							}
+							elseif($config_option_value == 'hhvm') {
+								$phpmode = 'hhvm';
+							}
+						}
+			
+						if($config_option == 'phpversion') {
+							
+							$config_option_value = trim(strtolower($config_option_value));
+							if($defaultwebserver != 0 && ($phpmode != '' || $phpmode != 'no')) {
+								$php_versions = $soap_client->server_get_php_versions($soap_session_id,$defaultwebserver,$phpmode);
+								
+								foreach($php_versions as $php_name => $php_name_value) {
+									$php_name_string = explode(':',$php_name_value);
+									$php_name_string = strtolower($php_name_string[0]);
+									if(strcmp($php_name_string,$config_option_value) == 0) {
+										$phpversion = $php_name_value;
+									}
+								}
+							}
+						}
+					}
+				}
+				
+				logModuleCall('ispconfig3','ConfigOptions',$params['configoptions'],'Option Value: '.$config_option_value.' Retrieved string: '.$php_name_string,'','');
 				
 				$ispconfigparams = array(
 					'company_name' => $companyname,
@@ -427,7 +477,7 @@ function ispconfig3_CreateAccount($params) {
 						'zone' => $dns_id,
 						'name' => 'mail',
 						'type' => 'A',
-						'data' => $params['serverip'],
+						'data' => $defaultmailserverip['ip_address'],
 						'ttl' => '3600',
 						'active' => 'y'
 					);
@@ -491,7 +541,7 @@ function ispconfig3_CreateAccount($params) {
 						);
 						
 					$mail_id = $soap_client->mail_domain_add($soap_session_id,$client_id,$ispconfigparams);
-					logModuleCall('ispconfig3','CreateMailDomain',$mail_id,$ispconfigparams,'','');
+					logModuleCall('ispconfig3','CreateMailDomain',$mail_id.' - Mail Server IP:'.$defaultmailserverip['ip_address'],$ispconfigparams,'','');
 				}
 				
 				if($createweb == 'on') {
@@ -512,6 +562,7 @@ function ispconfig3_CreateAccount($params) {
 						'is_subdomainwww' => 1,
 						'subdomain' => $webautosubdomain,
 						'php' => $phpmode,
+						'fastcgi_php_version' => $phpversion,
 						'redirect_type' => '',
 						'redirect_path' => '',
 						'ssl' => 'y',
@@ -1174,16 +1225,20 @@ function ispconfig3_LoginLink($params) {
 	}
 		
     return '
-    <button type="button" class="btn btn-xs btn-success" onclick="ispconfigLogin">Login to Controlpanel</button>
+    <button type="button" class="btn btn-xs btn-success" onclick="$(\'#frmIspconfigLogin\').submit()">Login to Controlpanel</button>
     <script type="text/javascript">
-		function ispconfigLogin() {
-			$.ajax({
-				type: "post",
-				url: "'.$soap_url.'./login/index.php",
-				data: "s_mod=login&s_pg=index&username='.$params['username'].'&passwort='.$params['password'].'",
-				xhrFields: {withCredentials: true}
-			}).done(function(){ location.href=\''.$soap_url.'/index.php\' });
-		}
+    var ispconfigForm = "<form id=\"frmIspconfigLogin\" action=\"'.$soap_url.'/index.php\" method=\"GET\" target=\"_blank\"></form>";
+    $(document).ready(function(){
+        $("body").append(ispconfigForm);
+        $("#frmIspconfigLogin").submit(function(){
+            $.ajax({ 
+                type: "POST", 
+                url: "'.$soap_url.'/content.php",
+                data: "s_mod=login&s_pg=index&username='.$params['username'].'&passwort='.$params['password'].'", 
+                xhrFields: {withCredentials: true} 
+            });
+        });
+    });
     </script>';
 }
 
@@ -1202,16 +1257,18 @@ function ispconfig3_ClientArea($params) {
 	}
 	
     return '
-    <button type="button" class="btn btn-xs btn-success" onclick="ispconfigLogin">Login to Controlpanel</button>
+    <form id="frmIspconfigLogin" action="'.$soap_url.'/index.php" method="GET" target="_blank">
+    <button type="submit" class="btn btn-xs btn-success">CONTROLPANEL LOGIN</button>
+    </form>
     <script type="text/javascript">
-		function ispconfigLogin() {
-			$.ajax({
-				type: "post",
-				url: "'.$soap_url.'./login/index.php",
-				data: "s_mod=login&s_pg=index&username='.$params['username'].'&passwort='.$params['password'].'",
-				xhrFields: {withCredentials: true}
-			}).done(function(){ location.href=\''.$soap_url.'/index.php\' });
-		}
+    $("#frmIspconfigLogin").submit(function(){
+        $.ajax({ 
+            type: "POST", 
+            url: "'.$soap_url.'/content.php",
+            data: "s_mod=login&s_pg=index&username='.$params['username'].'&passwort='.$params['password'].'", 
+            xhrFields: {withCredentials: true} 
+        });
+    });
     </script>';
 }
 
