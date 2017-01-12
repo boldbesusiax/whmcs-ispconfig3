@@ -157,6 +157,8 @@ function ispconfig3_CreateAccount($params) {
 	$params['configoption12'] == 'on' ? $webenablessi = 'y' : $webenablessi = '';
 	$params['configoption13'] == 'on' ? $webenableruby = 'y' : $webenableruby = '';
 	$params['configoption14'] == 'on' ? $webenablesuexec = 'y' : $webenablesuexec = '';
+	$webenableperl = '';
+	$webenablepython = '';
 	$webautosubdomain = $params['configoption15'];
 	$webcreateftp = $params['configoption16'];
 	$createdns = $params['configoption17'];
@@ -398,6 +400,32 @@ function ispconfig3_CreateAccount($params) {
 								}
 							}
 						}
+						
+						if($config_option == 'enable_cgi') {
+							if($config_option_value == '1') {
+								$webenablecgi = 'y';
+							}
+						}
+						elseif($config_option == 'enable_ssi') {
+							if($config_option_value == '1') {
+								$webenablessi = 'y';
+							}
+						}
+						elseif($config_option == 'enable_perl') {
+							if($config_option_value == '1') {
+								$webenableperl = 'y';
+							}
+						}
+						elseif($config_option == 'enable_ruby') {
+							if($config_option_value == '1') {
+								$webenableruby = 'y';
+							}
+						}
+						elseif($config_option == 'enable_python') {
+							if($config_option_value == '1') {
+								$webenablepython = 'y';
+							}
+						}
 					}
 				}
 				
@@ -556,7 +584,9 @@ function ispconfig3_CreateAccount($params) {
 						'traffic_quota' => $webtraffic,
 						'cgi' => $webenablecgi,
 						'ssi' => $webenablessi,
+						'perl' => $webenableperl,
 						'ruby' => $webenableruby,
+						'python' => $webenablepython,
 						'suexec' => $webenablesuexec,
 						'errordocs' => '',
 						'is_subdomainwww' => 1,
@@ -956,8 +986,58 @@ function ispconfig3_SuspendAccount($params) {
 			);
 			$reseller_id = 0;
 			$client_id = $soap_client->client_get_by_username($soap_session_id,$username);
+			$client_id_info = $soap_client->client_get($soap_session_id,$client_id['client_id']);
 			$result = $soap_client->client_update($soap_session_id,$client_id['client_id'],$reseller_id,$ispconfigparams);
 			logModuleCall('ispconfig3','Suspend Account',$client_id['client_id'],$ispconfigparams,'','');
+			logModuleCall('ispconfig3','Suspend Account Info',$client_id['client_id'],$client_id_info,'','');
+			
+			if($createdns == 'on') {
+				$dns_id = $soap_client->dns_zone_get_by_user($soap_session_id,$client_id['client_id'],$client_id_info['default_dnsserver']);
+				$index = 0;
+				
+				while($index <= (count($dns_id) - 1)) {
+					$zone_id = $soap_client->dns_zone_set_status($soap_session_id,$dns_id[$index]['id'],'inactive');
+					++$index;
+					logModuleCall('ispconfig3','Suspend DNS',$dns_id,$zone_id,'','');
+				}
+			}
+			
+			if($createmail == 'on') {
+				$index = 0;
+				
+				while($index <= (count($dns_id) - 1)) {
+					$dns_domain = rtrim($dns_id[$index]['origin'],'.');
+					$mail_domain = $soap_client->mail_domain_get_by_domain($soap_session_id,$dns_domain);
+					$mail_id = $soap_client->mail_domain_set_status($soap_session_id,$mail_domain[0]['domain_id'],'inactive');
+					++$index;
+					logModuleCall('ispconfig3','Suspend Mail',$mail_domain,$mail_id,'','');
+				}
+			}
+			
+			if($createweb == 'on') {
+				$web_domain = $soap_client->client_get_sites_by_user($soap_session_id,$client_id['client_id'],$client_id['default_group']);
+				$index = 0;
+				
+				while($index <= (count($web_domain) - 1)) {
+					$web_id = $soap_client->sites_web_domain_set_status($soap_session_id,$web_domain[$index]['domain_id'],'inactive');
+					
+					$ftp_name = $soap_client->sites_ftp_user_get($soap_session_id,array('parent_domain_id' => $web_domain[$index]['domain_id']));
+					if(count($ftp_name) > 0) {
+						$index_ftp = 0;
+						while($index_ftp <= (count($ftp_name) - 1)) {
+							$ftp_username = $ftp_name[$index_ftp]['username'];
+							$ftp_name[$index_ftp]['active'] = 'n';
+							$ftp_id = $soap_client->sites_ftp_user_update($soap_session_id,$client_id['client_id'],$ftp_name[$index_ftp]['ftp_user_id'],ftp_name[$index_ftp]);
+							++$index_ftp;
+							logModuleCall('ispconfig3','Suspend FTP User',$ftp_username,$ftp_id,'','');
+						}
+					}
+					
+					++$index;
+					logModuleCall('ispconfig3','Suspend Web Site',$web_domain,$web_id,'','');
+				}
+			}
+			
 			$soap_client->logout($soap_session_id);
 			
 			if($result == 1) {
@@ -998,11 +1078,11 @@ function ispconfig3_UnsuspendAccount($params) {
 	$domain = strtolower($params['domain']);
 	$clientdetails = $params['clientsdetails'];
 	
-	$fullname = htmlspecialchars_decode($clientdetails['firstname']) . ' ' . htmlspecialchars_decode($clientdetails['lastname']);
+	$fullname = htmlspecialchars_decode($clientdetails['firstname']).' '.htmlspecialchars_decode($clientdetails['lastname']);
 	$companyname = htmlspecialchars_decode($clientdetails['companyname']);
 	$address = $clientdetails['address1'];
 	if(!empty($clientdetails['address2'])) {
-		$address = $clientdetails['address1'] . $clientdetails['address2'];
+		$address = $clientdetails['address1'].$clientdetails['address2'];
 	}
 	$zip = $clientdetails['postcode'];
 	$city = $clientdetails['city'];
@@ -1033,7 +1113,7 @@ function ispconfig3_UnsuspendAccount($params) {
 	
 	logModuleCall('ispconfig3','CreateClient',$params['clientdetails'],$params,'','');
 	
-	if ($usessl == 'on') {
+	if($usessl == 'on') {
 		
 		$soap_url = 'https://' . $soapurl . '/remote/index.php';
 		$soap_uri = 'https://' . $soapurl . '/remote/';
@@ -1069,8 +1149,58 @@ function ispconfig3_UnsuspendAccount($params) {
 			);
 			$reseller_id = 0;
 			$client_id = $soap_client->client_get_by_username($soap_session_id,$username);
+			$client_id_info = $soap_client->client_get($soap_session_id,$client_id['client_id']);
 			$result = $soap_client->client_update($soap_session_id,$client_id['client_id'],$reseller_id,$ispconfigparams);
 			logModuleCall('ispconfig3','Unsuspend Account',$client_id['client_id'],$ispconfigparams,'','');
+			logModuleCall('ispconfig3','Unsuspend Account Info',$client_id['client_id'],$client_id_info,'','');
+			
+			if($createdns == 'on') {
+				$dns_id = $soap_client->dns_zone_get_by_user($soap_session_id,$client_id['client_id'],$client_id_info['default_dnsserver']);
+				$index = 0;
+				
+				while($index <= (count($dns_id) - 1)) {
+					$zone_id = $soap_client->dns_zone_set_status($soap_session_id,$dns_id[$index]['id'],'active');
+					++$index;
+					logModuleCall('ispconfig3','Unsuspend DNS',$dns_id,$zone_id,'','');
+				}
+			}
+			
+			if($createmail == 'on') {
+				$index = 0;
+				
+				while($index <= (count($dns_id) - 1)) {
+					$dns_domain = rtrim($dns_id[$index]['origin'],'.');
+					$mail_domain = $soap_client->mail_domain_get_by_domain($soap_session_id,$dns_domain);
+					$mail_id = $soap_client->mail_domain_set_status($soap_session_id,$mail_domain[0]['domain_id'],'active');
+					++$index;
+					logModuleCall('ispconfig3','Unsuspend Mail',$mail_domain,$mail_id,'','');
+				}
+			}
+			
+			if($createweb == 'on') {
+				$web_domain = $soap_client->client_get_sites_by_user($soap_session_id,$client_id['client_id'],$client_id['default_group']);
+				$index = 0;
+				
+				while($index <= (count($web_domain) - 1)) {
+					$web_id = $soap_client->sites_web_domain_set_status($soap_session_id,$web_domain[$index]['domain_id'],'active');
+					
+					$ftp_name = $soap_client->sites_ftp_user_get($soap_session_id,array('parent_domain_id' => $web_domain[$index]['domain_id']));
+					if(count($ftp_name) > 0) {
+						$index_ftp = 0;
+						while($index_ftp <= (count($ftp_name) - 1)) {
+							$ftp_username = $ftp_name[$index_ftp]['username'];
+							$ftp_name[$index_ftp]['active'] = 'y';
+							$ftp_id = $soap_client->sites_ftp_user_update($soap_session_id,$client_id['client_id'],$ftp_name[$index_ftp]['ftp_user_id'],ftp_name[$index_ftp]);
+							++$index_ftp;
+							logModuleCall('ispconfig3','Unsuspend FTP User',$ftp_username,$ftp_id,'','');
+						}
+					}
+					
+					++$index;
+					logModuleCall('ispconfig3','Unsuspend Web Site',$web_domain,$web_id,'','');
+				}
+			}
+			
 			$soap_client->logout($soap_session_id);
 			
 			if($result == 1) {
