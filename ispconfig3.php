@@ -70,7 +70,7 @@ function ispconfig3_ConfigOptions() {
 		),
 		'PHP Mode' => array(
 			'Type' => 'dropdown',
-			'Options' => 'no,cgi,fast-cgi,php-fpm,hhvm'
+			'Options' => 'no,mod,cgi,fast-cgi,php-fpm,hhvm'
 		),
 		'Website Storage Quota' => array(
 			'Type' => 'text',
